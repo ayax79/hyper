@@ -163,3 +163,4 @@ mod tests {
 }
 
 bench_header!(normal, CacheControl, { vec![b"no-cache, private".to_vec(), b"max-age=100".to_vec()] });
+
