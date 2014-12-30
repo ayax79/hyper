@@ -2,7 +2,8 @@ use std::fmt::{mod, Show};
 use std::str::FromStr;
 use time::Tm;
 use header::{Header, HeaderFormat};
-use super::util::{from_one_raw_str, tm_from_str};
+use header::shared::util::from_one_raw_str;
+use header::shared::time::tm_from_str;
 
 /// The `LastModified` header field.
 #[deriving(Copy, PartialEq, Clone)]
