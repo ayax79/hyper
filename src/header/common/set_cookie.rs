@@ -13,6 +13,10 @@ use cookie::CookieJar;
 #[deriving(Clone, PartialEq, Show)]
 pub struct SetCookie(pub Vec<Cookie>);
 
+//TODO: remove when fixed in libstd
+unsafe impl Send for SetCookie {}
+unsafe impl Sync for SetCookie {}
+
 deref!(SetCookie -> Vec<Cookie>);
 
 impl Header for SetCookie {
@@ -24,8 +28,8 @@ impl Header for SetCookie {
         let mut set_cookies = Vec::with_capacity(raw.len());
         for set_cookies_raw in raw.iter() {
             match from_utf8(set_cookies_raw[]) {
-                Some(s) if !s.is_empty() => {
-                    match from_str(s) {
+                Ok(s) if !s.is_empty() => {
+                    match s.parse() {
                         Some(cookie) => set_cookies.push(cookie),
                         None => ()
                     }

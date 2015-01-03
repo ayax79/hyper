@@ -4,7 +4,7 @@ use std::cmp::min;
 use std::fmt;
 use std::io::{mod, Reader, IoResult, BufWriter};
 use std::num::from_u16;
-use std::str::{mod, SendStr};
+use std::str::{mod, SendStr, FromStr};
 
 use url::Url;
 use url::ParseError as UrlError;
@@ -260,7 +260,7 @@ impl<W: Writer> Writer for HttpWriter<W> {
                     Err(io::IoError {
                         kind: io::ShortWrite(bytes),
                         desc: "EmptyWriter cannot write any bytes",
-                        detail: Some("Cannot include a body with this kind of message".into_string())
+                        detail: Some("Cannot include a body with this kind of message".to_string())
                     })
                 }
             }
@@ -370,13 +370,11 @@ fn read_token_until_space<R: Reader>(stream: &mut R, buf: &mut [u8]) -> HttpResu
 /// ### Note:
 /// Extension methods are only parsed to 16 characters.
 pub fn read_method<R: Reader>(stream: &mut R) -> HttpResult<method::Method> {
-    let mut buf = [SP, ..16];
+    let mut buf = [SP; 16];
 
     if !try!(read_token_until_space(stream, &mut buf)) {
         return Err(HttpMethodError);
     }
-
-    debug!("method buf = {}", buf[].to_ascii());
 
     let maybe_method = match buf[0..7] {
         b"GET    " => Some(method::Method::Get),
@@ -397,7 +395,7 @@ pub fn read_method<R: Reader>(stream: &mut R) -> HttpResult<method::Method> {
         (Some(method), _) => Ok(method),
         (None, ext) => {
             // We already checked that the buffer is ASCII
-            Ok(method::Method::Extension(unsafe { str::from_utf8_unchecked(ext) }.trim().into_string()))
+            Ok(method::Method::Extension(unsafe { str::from_utf8_unchecked(ext) }.trim().to_string()))
         },
     }
 }
@@ -544,8 +542,9 @@ pub fn read_header<R: Reader>(stream: &mut R) -> HttpResult<Option<RawHeaderLine
             }
         };
     }
-
-    debug!("header value = {}", value[].to_ascii());
+    // Remove optional trailing whitespace
+    let real_len = value.len() - value.iter().rev().take_while(|&&x| b' ' == x).count();
+    value.truncate(real_len);
 
     match try!(stream.read_byte()) {
         LF => Ok(Some((name, value))),
@@ -588,7 +587,7 @@ pub struct RawStatus(pub u16, pub SendStr);
 
 impl Clone for RawStatus {
     fn clone(&self) -> RawStatus {
-        RawStatus(self.0, (*self.1).clone().into_cow())
+        RawStatus(self.0, self.1.clone().into_cow())
     }
 }
 
@@ -622,7 +621,7 @@ pub fn read_status<R: Reader>(stream: &mut R) -> HttpResult<RawStatus> {
         try!(stream.read_byte()),
     ];
 
-    let code = match str::from_utf8(code.as_slice()).and_then(from_str::<u16>) {
+    let code = match str::from_utf8(code.as_slice()).ok().and_then(FromStr::from_str) {
         Some(num) => num,
         None => return Err(HttpStatusError)
     };
@@ -632,7 +631,7 @@ pub fn read_status<R: Reader>(stream: &mut R) -> HttpResult<RawStatus> {
         _ => return Err(HttpStatusError)
     }
 
-    let mut buf = [b' ', ..32];
+    let mut buf = [b' '; 32];
 
     {
         let mut bufwrt = BufWriter::new(&mut buf);
@@ -662,8 +661,8 @@ pub fn read_status<R: Reader>(stream: &mut R) -> HttpResult<RawStatus> {
     }
 
     let reason = match str::from_utf8(buf[]) {
-        Some(s) => s.trim(),
-        None => return Err(HttpStatusError)
+        Ok(s) => s.trim(),
+        Err(_) => return Err(HttpStatusError)
     };
 
     let reason = match from_u16::<StatusCode>(code) {
@@ -672,10 +671,10 @@ pub fn read_status<R: Reader>(stream: &mut R) -> HttpResult<RawStatus> {
                 if phrase == reason {
                     Borrowed(phrase)
                 } else {
-                    Owned(reason.into_string())
+                    Owned(reason.to_string())
                 }
             }
-            _ => Owned(reason.into_string())
+            _ => Owned(reason.to_string())
         },
         None => return Err(HttpStatusError)
     };

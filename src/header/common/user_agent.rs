@@ -28,3 +28,4 @@ impl HeaderFormat for UserAgent {
 }
 
 bench_header!(bench, UserAgent, { vec![b"cargo bench".to_vec()] });
+

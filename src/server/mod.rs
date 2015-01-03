@@ -3,7 +3,7 @@ use std::io::{Listener, EndOfFile, BufferedReader, BufferedWriter};
 use std::io::net::ip::{IpAddr, Port, SocketAddr};
 use std::os;
 use std::sync::{Arc, TaskPool};
-use std::task::TaskBuilder;
+use std::thread::{Builder, JoinGuard};
 
 
 pub use self::request::Request;
@@ -68,7 +68,7 @@ impl<L: NetworkListener<S, A>, S: NetworkStream, A: NetworkAcceptor<S>> Server<L
         let acceptor = try!(listener.listen());
 
         let mut captured = acceptor.clone();
-        TaskBuilder::new().named("hyper acceptor").spawn(move || {
+        let guard = Builder::new().name("hyper acceptor".to_string()).spawn(move || {
             let handler = Arc::new(handler);
             debug!("threads = {}", threads);
             let pool = TaskPool::new(threads);
@@ -130,6 +130,7 @@ impl<L: NetworkListener<S, A>, S: NetworkStream, A: NetworkAcceptor<S>> Server<L
 
         Ok(Listening {
             acceptor: acceptor,
+            guard: Some(guard),
             socket: socket,
         })
     }
@@ -149,11 +150,19 @@ impl<L: NetworkListener<S, A>, S: NetworkStream, A: NetworkAcceptor<S>> Server<L
 /// A listening server, which can later be closed.
 pub struct Listening<A = HttpAcceptor> {
     acceptor: A,
+    guard: Option<JoinGuard<()>>,
     /// The socket addresses that the server is bound to.
     pub socket: SocketAddr,
 }
 
 impl<A: NetworkAcceptor<S>, S: NetworkStream> Listening<A> {
+    /// Causes the current thread to wait for this listening to complete.
+    pub fn await(&mut self) {
+        if let Some(guard) = self.guard.take() {
+            let _ = guard.join();
+        }
+    }
+
     /// Stop the server from listening to its socket address.
     pub fn close(&mut self) -> HttpResult<()> {
         debug!("closing server");
@@ -170,7 +179,7 @@ pub trait Handler: Sync + Send {
     fn handle(&self, Request, Response<Fresh>);
 }
 
-impl Handler for fn(Request, Response<Fresh>) {
+impl<F> Handler for F where F: Fn(Request, Response<Fresh>), F: Sync + Send {
     fn handle(&self, req: Request, res: Response<Fresh>) {
         (*self)(req, res)
     }

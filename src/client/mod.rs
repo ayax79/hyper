@@ -315,7 +315,7 @@ impl<'a> IntoUrl for &'a str {
 }
 
 /// Behavior regarding how to handle redirects within a Client.
-#[deriving(Copy, Clone)]
+#[deriving(Copy)]
 pub enum RedirectPolicy {
     /// Don't follow any redirects.
     FollowNone,
@@ -323,6 +323,13 @@ pub enum RedirectPolicy {
     FollowAll,
     /// Follow a redirect if the contained function returns true.
     FollowIf(fn(&Url) -> bool),
+}
+
+// This is a hack because of upstream typesystem issues. 
+impl Clone for RedirectPolicy {
+    fn clone(&self) -> RedirectPolicy {
+        *self 
+    }
 }
 
 impl Default for RedirectPolicy {
@@ -374,7 +381,7 @@ mod tests {
         client.set_redirect_policy(RedirectPolicy::FollowAll);
 
         let res = client.get("http://127.0.0.1").send().unwrap();
-        assert_eq!(res.headers.get(), Some(&Server("mock3".into_string())));
+        assert_eq!(res.headers.get(), Some(&Server("mock3".to_string())));
     }
 
     #[test]
@@ -382,7 +389,7 @@ mod tests {
         let mut client = Client::with_connector(MockRedirectPolicy);
         client.set_redirect_policy(RedirectPolicy::FollowNone);
         let res = client.get("http://127.0.0.1").send().unwrap();
-        assert_eq!(res.headers.get(), Some(&Server("mock1".into_string())));
+        assert_eq!(res.headers.get(), Some(&Server("mock1".to_string())));
     }
 
     #[test]
@@ -393,7 +400,7 @@ mod tests {
         let mut client = Client::with_connector(MockRedirectPolicy);
         client.set_redirect_policy(RedirectPolicy::FollowIf(follow_if));
         let res = client.get("http://127.0.0.1").send().unwrap();
-        assert_eq!(res.headers.get(), Some(&Server("mock2".into_string())));
+        assert_eq!(res.headers.get(), Some(&Server("mock2".to_string())));
     }
 
 }

@@ -13,7 +13,7 @@
 //!
 //! ## Internal Design
 //!
-//! Hyper is designed as a relatively low-level wrapped over raw HTTP. It should
+//! Hyper is designed as a relatively low-level wrapper over raw HTTP. It should
 //! allow the implementation of higher-level abstractions with as little pain as
 //! possible, and should not irrevocably hide any information from its users.
 //!
@@ -125,7 +125,7 @@
 //! implement `Reader` and can be read to get the data out of a `Response`.
 //!
 
-extern crate serialize;
+extern crate "rustc-serialize" as serialize;
 extern crate time;
 extern crate url;
 extern crate openssl;
@@ -154,7 +154,7 @@ use self::HttpError::{HttpMethodError, HttpUriError, HttpVersionError,
 
 macro_rules! todo(
     ($($arg:tt)*) => (if cfg!(not(ndebug)) {
-        format_args!(|args| log!(5, "TODO: {}", args), $($arg)*)
+        log!(5, "TODO: {}", format_args!($($arg)*))
     })
 );
 
@@ -170,7 +170,7 @@ impl fmt::Show for Trace {
 
 macro_rules! trace(
     ($($arg:tt)*) => (if cfg!(not(ndebug)) {
-        format_args!(|args| log!(5, "{}\n{}", args, ::Trace), $($arg)*)
+        log!(5, "{}\n{}", format_args!($($arg)*), ::Trace)
     })
 );
 
